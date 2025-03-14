@@ -5,7 +5,7 @@ out vec4 FragColor;
 in vec2 FragCoord;
 
 // Size of the chessboard squares
-const float squareSize = 1.0 / 16.0; // For a NxN square, squareSize = 1.0 / (N * 2)
+const float squareSize = 1.0 / 8.0; // For a NxN square, squareSize = 1.0 / (N)
 
 void main()
 {

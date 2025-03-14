@@ -48,17 +48,17 @@ int main()
 
     // build and compile our shader program
     // ------------------------------------
-    Shader ourShader("../shaders/vertexShader.vert", "../shaders/fragmentShader.frag");
-    Shader pieceShader("../shaders/quadVertex.vert", "../shaders/quadFragment.frag");
-    
+    Shader ourShader("../shaders/board_vs.vert", "../shaders/board_fs.frag");
+    Shader pieceShader("../shaders/piece_vs.vert", "../shaders/piece_fs.frag");
+
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     float rectangleVertices[] = {
         // positions         // colors
-        0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
-        -0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f,  // top left
-        0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f    // top right
+        1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom right
+        -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
+        -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // top left
+        1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f    // top right
     };
 
     unsigned int rectangleIndices[] = {
@@ -92,10 +92,6 @@ int main()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Load texture with GL_RGBA format for PNG transparency
-    Texture rookTexture("../resources/rook.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    pieceShader.use();
-    pieceShader.setInt("pieceTexture", 0);
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -115,8 +111,8 @@ int main()
 
         // Render quad with texture
         pieceShader.use();
-        rookTexture.bind(0, GL_TEXTURE_2D);
         quad.renderShape(quadIndex, 6, 6, GL_TRIANGLES);
+
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
