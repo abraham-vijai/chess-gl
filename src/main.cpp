@@ -8,11 +8,18 @@
 #include "Shader.h"
 #include "Texture.h"
 #include "ShapeManager.h"
-#include "Board.h"
 
+// -----------------------------------------------
+// FUNCTION PROTOTYPES 
+// -----------------------------------------------
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
+void renderPiece(Shader &shader, ShapeManager &quad, int quadIndex, Texture &texture, const glm::vec3 &position, float scale = 0.125f);
+void setupPieces(Shader &pieceShader, ShapeManager &quad, int quadIndex, Texture textures[], bool isWhite);
 
+// -----------------------------------------------
+// GLOBAL VARIABLES 
+// -----------------------------------------------
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
 
@@ -21,7 +28,11 @@ int main()
     // -----------------------------------------------
     // INITIALIZE GLFW
     // -----------------------------------------------
-    glfwInit();
+    if (!glfwInit())
+    {
+        std::cerr << "Failed to initialize GLFW" << std::endl;
+        return -1;
+    }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -29,7 +40,7 @@ int main()
     GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
-        std::cout << "Failed to create GLFW window" << std::endl;
+        std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
@@ -47,13 +58,13 @@ int main()
     }
 
     // -----------------------------------------------
-    // LOAD SHADERS
+    // LOAD SHADERS 
     // -----------------------------------------------
     Shader ourShader("../shaders/board_vs.vert", "../shaders/board_fs.frag");
     Shader pieceShader("../shaders/piece_vs.vert", "../shaders/piece_fs.frag");
 
     // -----------------------------------------------
-    // SETUP VERTEX DATA
+    // SETUP VERTEX DATA 
     // -----------------------------------------------
     float rectangleVertices[] = {
         // positions         // colors
@@ -86,99 +97,57 @@ int main()
     int rectangleIndex = rectangle.createShape(rectangleVertices, sizeof(rectangleVertices), GL_STATIC_DRAW, rectangleIndices, sizeof(rectangleIndices));
     rectangle.addAttribute(rectangleIndex, 0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
     rectangle.addAttribute(rectangleIndex, 1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
-    // Create full quad for textures
+    // Create quad for texture
     ShapeManager quad;
     int quadIndex = quad.createShape(quadVertices, sizeof(quadVertices), GL_STATIC_DRAW, quadIndices, sizeof(quadIndices));
     quad.addAttribute(quadIndex, 0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
     quad.addAttribute(quadIndex, 1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
 
     // -----------------------------------------------
-    // LOAD TEXTURES
+    // SETUP TEXTURES 
     // -----------------------------------------------
     // Enable blending
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // Load textures for pieces
-    Texture wPawnTexture("../resources/w_pawn.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture bPawnTexture("../resources/b_pawn.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture wRookTexture("../resources/w_rook.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture bRookTexture("../resources/b_rook.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture wKnightTexture("../resources/w_knight.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture bKnightTexture("../resources/b_knight.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture bBishopTexture("../resources/b_bishop.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture wQueenTexture("../resources/w_queen.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture bQueenTexture("../resources/b_queen.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture wKingTexture("../resources/w_king.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
-    Texture bKingTexture("../resources/b_king.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT);
+    Texture textures[] = {
+        Texture("../resources/w_pawn.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT),   // 0
+        Texture("../resources/b_pawn.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT),   // 1
+        Texture("../resources/w_rook.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT),   // 2
+        Texture("../resources/b_rook.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT),   // 3
+        Texture("../resources/w_knight.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT), // 4
+        Texture("../resources/b_knight.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT), // 5
+        Texture("../resources/w_bishop.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT), // 6
+        Texture("../resources/b_bishop.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT), // 7
+        Texture("../resources/w_queen.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT),  // 8
+        Texture("../resources/b_queen.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT),  // 9
+        Texture("../resources/w_king.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT),   // 10
+        Texture("../resources/b_king.png", GL_TEXTURE_2D, GL_RGBA, GL_REPEAT, GL_REPEAT)    // 11
+    };
+
     // Setup shader uniform
     pieceShader.use();
     pieceShader.setInt("pieceTexture", 0);
 
-    // for (int i = 0; i < SCR_WIDTH; ++i)
-    // {
-    //     for (int j = 0; j < SCR_HEIGHT; ++j)
-    //     {
-    //         float fWidth = static_cast<float>(i / SCR_WIDTH) * 2.0f - 1.0f;
-    //         float fHeight = 1.0f - (static_cast<float>(j) / SCR_HEIGHT) * 2.0f;
-    //         float quadVertices[] = {
-    //             // positions   // texture coords
-    //             1.0f  , 1.0f  , 1.0f , 1.0f ,   // top right
-    //             1.0f  , -1.0f , 1.0f , 0.0f ,  // bottom right
-    //             -1.0f , -1.0f , 0.0f , 0.0f , // bottom left
-    //             -1.0f , 1.0f  , 0.0f , 1.0f    // top left
-    //         };
-    //     }
-    // }
-
     // -----------------------------------------------
-    // MAIN LOOP
+    // MAIN LOOP 
     // -----------------------------------------------
     while (!glfwWindowShouldClose(window))
     {
-        // input
+        // Input
         processInput(window);
 
         // -----------------------------------------------
-        // RENDER
+        // RENDER 
         // -----------------------------------------------
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         // Render rectangle
         ourShader.use();
         rectangle.renderShape(rectangleIndex, 6, 6, GL_TRIANGLES);
-        // Render quad with texture
-        pieceShader.use();
-        bPawnTexture.bind(0, GL_TEXTURE_2D);
-        // Setting up black pawn positions
-        for (int i = -7; i < 8; i++)
-        {
-            // glm::vec3(-7.0f, 5.0f, 0.0f) -> glm::vec3(7.0f, 5.0f, 0.0f) BLACK PAWN POSITION
-            if (i % 2 != 0)
-            {
-                glm::mat4 transform = glm::mat4(1.0f);
-                transform = glm::scale(transform, glm::vec3(0.125f, 0.125f, 1.0f));
-                float pawnX = static_cast<float>(i);
-                transform = glm::translate(transform, glm::vec3(pawnX, 5.0f, 0.0f)); // 1,3,5,7
-                pieceShader.setMat4("transform", transform);
-                quad.renderShape(quadIndex, 6, 6, GL_TRIANGLES);
-            }
-        }
-        pieceShader.use();
-        wPawnTexture.bind(0, GL_TEXTURE_2D);
-        // Setting up black pawn positions
-        for (int i = -7; i < 8; i++)
-        {
-            // glm::vec3(-7.0f, 5.0f, 0.0f) -> glm::vec3(7.0f, 5.0f, 0.0f) WHITE PAWN POSITION
-            if (i % 2 != 0)
-            {
-                glm::mat4 transform = glm::mat4(1.0f);
-                transform = glm::scale(transform, glm::vec3(0.125f, 0.125f, 1.0f));
-                float pawnX = static_cast<float>(i);
-                transform = glm::translate(transform, glm::vec3(pawnX, -5.0f, 0.0f)); // 1,3,5,7
-                pieceShader.setMat4("transform", transform);
-                quad.renderShape(quadIndex, 6, 6, GL_TRIANGLES);
-            }
-        }
+        // Render pieces
+        setupPieces(pieceShader, quad, quadIndex, textures, true);
+        setupPieces(pieceShader, quad, quadIndex, textures, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -188,19 +157,63 @@ int main()
     return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
+void renderPiece(Shader &shader, ShapeManager &quad, int quadIndex, Texture &texture, const glm::vec3 &position, float scale)
+{
+    shader.use();
+    texture.bind(0, GL_TEXTURE_2D);
+    glm::mat4 transform = glm::mat4(1.0f);
+    transform = glm::scale(transform, glm::vec3(scale, scale, 1.0f));
+    transform = glm::translate(transform, position);
+    shader.setMat4("transform", transform);
+    quad.renderShape(quadIndex, 6, 6, GL_TRIANGLES);
+}
+
+void setupPieces(Shader &pieceShader, ShapeManager &quad, int quadIndex, Texture textures[], bool isWhite)
+{
+    float multiplier = 0.0f;
+    int j = 0;
+    
+    // White
+    if (isWhite)
+    {
+        multiplier = 1.0f;
+    }
+    // Black
+    else
+    {
+        multiplier = -1.0f;
+        j = 1;
+    }
+
+    for (int i = -7; i < 8; i += 2)
+    {
+        renderPiece(pieceShader, quad, quadIndex, textures[j], glm::vec3(i, -5.0f * multiplier, 0.0f));
+    }
+
+    // White Rooks
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 2], glm::vec3(-7.0f, -7.0f * multiplier, 0.0f));
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 2], glm::vec3(7.0f, -7.0f * multiplier, 0.0f));
+
+    // White Knights
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 4], glm::vec3(-5.0f, -7.0f * multiplier, 0.0f));
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 4], glm::vec3(5.0f, -7.0f * multiplier, 0.0f));
+
+    // White Bishops
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 6], glm::vec3(-3.0f, -7.0f * multiplier, 0.0f));
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 6], glm::vec3(3.0f, -7.0f * multiplier, 0.0f));
+
+    // White King and Queen
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 8], glm::vec3(-1.0f, -7.0f * multiplier, 0.0f));
+    renderPiece(pieceShader, quad, quadIndex, textures[j + 10], glm::vec3(1.0f, -7.0f * multiplier, 0.0f));
+}
+
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-    // make sure the viewport matches the new window dimensions; note that width and
-    // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
 }
