@@ -1,0 +1,5 @@
+ChessGL.code-workspace
+.vscode/settings.json
+bin/main.exe
+src/TODO.txt
+resources/
