@@ -6,5 +6,4 @@ out vec4 FragColor;
 
 void main() {
     FragColor = texture(pieceTexture, TexCoords);
-    
 }
