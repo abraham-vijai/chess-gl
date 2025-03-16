@@ -4,21 +4,38 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <bitset>
 
 #include "Shader.h"
 #include "Texture.h"
 #include "ShapeManager.h"
+#include "Board.h"
+#include "Piece.h"
 
 // -----------------------------------------------
-// FUNCTION PROTOTYPES 
+// STRUCTS 
+// -----------------------------------------------
+struct PieceStruct
+{
+    int pieceType = 0;
+    glm::vec2 piecePos = glm::vec2(0.0f, 0.0f);
+    Texture *pieceTexture;
+
+    // Constructor
+    PieceStruct(int type, const glm::vec2 &pos, Texture *texture)
+        : pieceType(type), piecePos(pos), pieceTexture(texture) {}
+};
+
+// -----------------------------------------------
+// FUNCTION PROTOTYPES
 // -----------------------------------------------
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
-void renderPiece(Shader &shader, ShapeManager &quad, int quadIndex, Texture &texture, const glm::vec3 &position, float scale = 0.125f);
-void setupPieces(Shader &pieceShader, ShapeManager &quad, int quadIndex, Texture textures[], bool isWhite);
+void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex, const std::vector<PieceStruct> &pieces);
+void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[]);
 
 // -----------------------------------------------
-// GLOBAL VARIABLES 
+// GLOBAL VARIABLES
 // -----------------------------------------------
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
@@ -58,13 +75,13 @@ int main()
     }
 
     // -----------------------------------------------
-    // LOAD SHADERS 
+    // LOAD SHADERS
     // -----------------------------------------------
     Shader ourShader("../shaders/board_vs.vert", "../shaders/board_fs.frag");
     Shader pieceShader("../shaders/piece_vs.vert", "../shaders/piece_fs.frag");
 
     // -----------------------------------------------
-    // SETUP VERTEX DATA 
+    // SETUP VERTEX DATA
     // -----------------------------------------------
     float rectangleVertices[] = {
         // positions         // colors
@@ -92,11 +109,11 @@ int main()
     // -----------------------------------------------
     // CREATE SHAPES
     // -----------------------------------------------
-    // Create rectangle
-    ShapeManager rectangle;
-    int rectangleIndex = rectangle.createShape(rectangleVertices, sizeof(rectangleVertices), GL_STATIC_DRAW, rectangleIndices, sizeof(rectangleIndices));
-    rectangle.addAttribute(rectangleIndex, 0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
-    rectangle.addAttribute(rectangleIndex, 1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    // Create board
+    ShapeManager board;
+    int boardIndex = board.createShape(rectangleVertices, sizeof(rectangleVertices), GL_STATIC_DRAW, rectangleIndices, sizeof(rectangleIndices));
+    board.addAttribute(boardIndex, 0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    board.addAttribute(boardIndex, 1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
     // Create quad for texture
     ShapeManager quad;
     int quadIndex = quad.createShape(quadVertices, sizeof(quadVertices), GL_STATIC_DRAW, quadIndices, sizeof(quadIndices));
@@ -104,7 +121,7 @@ int main()
     quad.addAttribute(quadIndex, 1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
 
     // -----------------------------------------------
-    // SETUP TEXTURES 
+    // SETUP TEXTURES
     // -----------------------------------------------
     // Enable blending
     glEnable(GL_BLEND);
@@ -129,8 +146,12 @@ int main()
     pieceShader.use();
     pieceShader.setInt("pieceTexture", 0);
 
+    // Initialize pieces
+    std::vector<PieceStruct> pieces;
+    initializePieces(pieces, textures);
+
     // -----------------------------------------------
-    // MAIN LOOP 
+    // MAIN LOOP
     // -----------------------------------------------
     while (!glfwWindowShouldClose(window))
     {
@@ -138,16 +159,15 @@ int main()
         processInput(window);
 
         // -----------------------------------------------
-        // RENDER 
+        // RENDER
         // -----------------------------------------------
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-        // Render rectangle
+        // Render board
         ourShader.use();
-        rectangle.renderShape(rectangleIndex, 6, 6, GL_TRIANGLES);
+        board.renderShape(boardIndex, 6, 6, GL_TRIANGLES);
         // Render pieces
-        setupPieces(pieceShader, quad, quadIndex, textures, true);
-        setupPieces(pieceShader, quad, quadIndex, textures, false);
+        renderPieces(pieceShader, quad, quadIndex, pieces);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -157,54 +177,51 @@ int main()
     return 0;
 }
 
-void renderPiece(Shader &shader, ShapeManager &quad, int quadIndex, Texture &texture, const glm::vec3 &position, float scale)
+void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[])
 {
-    shader.use();
-    texture.bind(0, GL_TEXTURE_2D);
-    glm::mat4 transform = glm::mat4(1.0f);
-    transform = glm::scale(transform, glm::vec3(scale, scale, 1.0f));
-    transform = glm::translate(transform, position);
-    shader.setMat4("transform", transform);
-    quad.renderShape(quadIndex, 6, 6, GL_TRIANGLES);
-}
 
-void setupPieces(Shader &pieceShader, ShapeManager &quad, int quadIndex, Texture textures[], bool isWhite)
-{
-    float multiplier = 0.0f;
-    int j = 0;
-    
-    // White
-    if (isWhite)
-    {
-        multiplier = 1.0f;
-    }
-    // Black
-    else
-    {
-        multiplier = -1.0f;
-        j = 1;
-    }
-
+    // Add white pieces
+    pieces.emplace_back(Piece::Rook | Piece::White, glm::vec2(-7.0f, -7.0f), &textures[2]);
+    pieces.emplace_back(Piece::Knight | Piece::White, glm::vec2(-5.0f, -7.0f), &textures[4]);
+    pieces.emplace_back(Piece::Bishop | Piece::White, glm::vec2(-3.0f, -7.0f), &textures[6]);
+    pieces.emplace_back(Piece::Queen | Piece::White, glm::vec2(-1.0f, -7.0f), &textures[8]);
+    pieces.emplace_back(Piece::King | Piece::White, glm::vec2(1.0f, -7.0f), &textures[10]);
+    pieces.emplace_back(Piece::Bishop | Piece::White, glm::vec2(3.0f, -7.0f), &textures[6]);
+    pieces.emplace_back(Piece::Knight | Piece::White, glm::vec2(5.0f, -7.0f), &textures[4]);
+    pieces.emplace_back(Piece::Rook | Piece::White, glm::vec2(7.0f, -7.0f), &textures[2]);
+    // White pawns
     for (int i = -7; i < 8; i += 2)
     {
-        renderPiece(pieceShader, quad, quadIndex, textures[j], glm::vec3(i, -5.0f * multiplier, 0.0f));
+        pieces.emplace_back(Piece::Pawn | Piece::White, glm::vec2(i, -5.0f), &textures[0]);
     }
+    // Add black pieces
+    pieces.emplace_back(Piece::Rook | Piece::Black, glm::vec2(-7.0f, 7.0f), &textures[3]);
+    pieces.emplace_back(Piece::Knight | Piece::Black, glm::vec2(-5.0f, 7.0f), &textures[5]);
+    pieces.emplace_back(Piece::Bishop | Piece::Black, glm::vec2(-3.0f, 7.0f), &textures[7]);
+    pieces.emplace_back(Piece::Queen | Piece::Black, glm::vec2(-1.0f, 7.0f), &textures[9]);
+    pieces.emplace_back(Piece::King | Piece::Black, glm::vec2(1.0f, 7.0f), &textures[11]);
+    pieces.emplace_back(Piece::Bishop | Piece::Black, glm::vec2(3.0f, 7.0f), &textures[7]);
+    pieces.emplace_back(Piece::Knight | Piece::Black, glm::vec2(5.0f, 7.0f), &textures[5]);
+    pieces.emplace_back(Piece::Rook | Piece::Black, glm::vec2(7.0f, 7.0f), &textures[3]);
+    // Black pawns
+    for (int i = -7; i < 8; i += 2)
+    {
+        pieces.emplace_back(Piece::Pawn | Piece::Black, glm::vec2(i, 5.0f), &textures[1]);
+    }
+}
 
-    // White Rooks
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 2], glm::vec3(-7.0f, -7.0f * multiplier, 0.0f));
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 2], glm::vec3(7.0f, -7.0f * multiplier, 0.0f));
-
-    // White Knights
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 4], glm::vec3(-5.0f, -7.0f * multiplier, 0.0f));
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 4], glm::vec3(5.0f, -7.0f * multiplier, 0.0f));
-
-    // White Bishops
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 6], glm::vec3(-3.0f, -7.0f * multiplier, 0.0f));
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 6], glm::vec3(3.0f, -7.0f * multiplier, 0.0f));
-
-    // White King and Queen
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 8], glm::vec3(-1.0f, -7.0f * multiplier, 0.0f));
-    renderPiece(pieceShader, quad, quadIndex, textures[j + 10], glm::vec3(1.0f, -7.0f * multiplier, 0.0f));
+void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex, const std::vector<PieceStruct> &pieces)
+{
+    for (const auto &piece : pieces)
+    {
+        shader.use();
+        (*piece.pieceTexture).bind(0, GL_TEXTURE_2D);
+        glm::mat4 transform = glm::mat4(1.0f);
+        transform = glm::scale(transform, glm::vec3(0.125f, 0.125f, 1.0f));
+        transform = glm::translate(transform, glm::vec3(piece.piecePos.x, piece.piecePos.y, 0.0f));
+        shader.setMat4("transform", transform);
+        quad.renderShape(quadIndex, 6, 6, GL_TRIANGLES);
+    }
 }
 
 void processInput(GLFWwindow *window)
