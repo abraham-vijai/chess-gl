@@ -3,7 +3,6 @@
 #include <iostream>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
-#include <typeinfo>
 #include <unordered_map>
 
 #include "Shader.h"
@@ -41,7 +40,7 @@ Texture *getTexture(int pieceType, Texture textures[]);
 // -----------------------------------------------
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
-#define FEN_STRING "rnb1kbnr/pp1ppppp/8/1q6/3p4/2Q5/PPPPPPPP/RNB1KBNR"
+#define FEN_STRING "r1bqkbnr/p1pppppp/8/1pn1P3/6P1/2PP1P1P/PP6/RNBQKBNR"
 
 int main()
 {
@@ -303,7 +302,7 @@ void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[])
 
         // Calculate the position of the cell in OpenGL coordinates
         float x = -7.0f + 2.0f * (static_cast<float>(col));
-        float y = -7.0f + 2.0f * (static_cast<float>(row));
+        float y = 7.0f - 2.0f * (static_cast<float>(row));
 
         // Get piece type
         int pieceType = chessBoard.Square[i];
