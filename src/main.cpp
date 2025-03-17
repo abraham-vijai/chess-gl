@@ -1,10 +1,10 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <bitset>
+#include <string>
+#include <typeinfo>
+#include <unordered_map>
 
 #include "Shader.h"
 #include "Texture.h"
@@ -13,7 +13,7 @@
 #include "Piece.h"
 
 // -----------------------------------------------
-// STRUCTS 
+// STRUCTS
 // -----------------------------------------------
 struct PieceStruct
 {
@@ -33,12 +33,15 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex, const std::vector<PieceStruct> &pieces);
 void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[]);
+void parseFenString(const std::string &fenString, Board &board, Texture textures[]);
+Texture *getTexture(int pieceType, Texture textures[]);
 
 // -----------------------------------------------
 // GLOBAL VARIABLES
 // -----------------------------------------------
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
+#define FEN_STRING "rnb1kbnr/pp1ppppp/8/1q6/3p4/2Q5/PPPPPPPP/RNB1KBNR"
 
 int main()
 {
@@ -177,36 +180,139 @@ int main()
     return 0;
 }
 
+void parseFenString(const std::string &fenString, Board &board, Texture textures[])
+{
+    // Map FEN characters to piece types
+    static const std::unordered_map<char, int> fenToPiece = {
+        {'r', Piece::Rook | Piece::Black}, {'n', Piece::Knight | Piece::Black}, {'b', Piece::Bishop | Piece::Black}, 
+        {'q', Piece::Queen | Piece::Black}, {'k', Piece::King | Piece::Black}, {'p', Piece::Pawn | Piece::Black}, 
+        {'R', Piece::Rook | Piece::White}, {'N', Piece::Knight | Piece::White}, {'B', Piece::Bishop | Piece::White}, 
+        {'Q', Piece::Queen | Piece::White}, {'K', Piece::King | Piece::White}, {'P', Piece::Pawn | Piece::White}
+    };
+
+    int squareIndex = 0; // Tracks the current square on the board
+
+    for (char fenChar : fenString)
+    {
+        if (fenChar == '/')
+        {
+            // Skip slashes (they separate ranks in FEN)
+            continue;
+        }
+        else if (std::isdigit(fenChar))
+        {
+            // Handle numbers (represent empty squares)
+            int emptySquares = fenChar - '0';
+            for (int i = 0; i < emptySquares; i++)
+            {
+                if (squareIndex >= 64)
+                {
+                    // Prevent out-of-bounds access
+                    break;
+                }
+                board.Square[squareIndex++] = Piece::None;
+            }
+        }
+        else
+        {
+            // Handle piece characters
+            auto it = fenToPiece.find(fenChar);
+            if (it != fenToPiece.end())
+            {
+                if (squareIndex >= 64)
+                {
+                    // Prevent out-of-bounds access
+                    break;
+                }
+                board.Square[squareIndex++] = it->second;
+            }
+            else
+            {
+                std::cerr << "Invalid FEN character: " << fenChar << std::endl;
+            }
+        }
+    }
+}
+
+Texture *getTexture(int pieceType, Texture textures[])
+{
+    // Check if the piece is black or white
+    bool isBlack = (pieceType & Piece::Black) == Piece::Black;
+    bool isWhite = (pieceType & Piece::White) == Piece::White;
+
+    // Mask out the color bits to get the piece type
+    int type = pieceType & 0b111; // 0b111 is the mask for the piece type
+
+    // Determine the texture index based on the piece type and color
+    if (isBlack)
+    {
+        switch (type)
+        {
+        case Piece::Rook:
+            return &textures[3]; // Black rook
+        case Piece::Knight:
+            return &textures[5]; // Black knight
+        case Piece::Bishop:
+            return &textures[7]; // Black bishop
+        case Piece::Queen:
+            return &textures[9]; // Black queen
+        case Piece::King:
+            return &textures[11]; // Black king
+        case Piece::Pawn:
+            return &textures[1]; // Black pawn
+        default:
+            return nullptr; // Unknown piece type
+        }
+    }
+    else if (isWhite)
+    {
+        switch (type)
+        {
+        case Piece::Rook:
+            return &textures[2]; // White rook
+        case Piece::Knight:
+            return &textures[4]; // White knight
+        case Piece::Bishop:
+            return &textures[6]; // White bishop
+        case Piece::Queen:
+            return &textures[8]; // White queen
+        case Piece::King:
+            return &textures[10]; // White king
+        case Piece::Pawn:
+            return &textures[0]; // White pawn
+        default:
+            return nullptr; // Unknown piece type
+        }
+    }
+
+    // If the piece has no color (invalid), return nullptr
+    return nullptr;
+}
+
 void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[])
 {
+    pieces.clear();
 
-    // Add white pieces
-    pieces.emplace_back(Piece::Rook | Piece::White, glm::vec2(-7.0f, -7.0f), &textures[2]);
-    pieces.emplace_back(Piece::Knight | Piece::White, glm::vec2(-5.0f, -7.0f), &textures[4]);
-    pieces.emplace_back(Piece::Bishop | Piece::White, glm::vec2(-3.0f, -7.0f), &textures[6]);
-    pieces.emplace_back(Piece::Queen | Piece::White, glm::vec2(-1.0f, -7.0f), &textures[8]);
-    pieces.emplace_back(Piece::King | Piece::White, glm::vec2(1.0f, -7.0f), &textures[10]);
-    pieces.emplace_back(Piece::Bishop | Piece::White, glm::vec2(3.0f, -7.0f), &textures[6]);
-    pieces.emplace_back(Piece::Knight | Piece::White, glm::vec2(5.0f, -7.0f), &textures[4]);
-    pieces.emplace_back(Piece::Rook | Piece::White, glm::vec2(7.0f, -7.0f), &textures[2]);
-    // White pawns
-    for (int i = -7; i < 8; i += 2)
+    Board chessBoard;
+    parseFenString(FEN_STRING, chessBoard, textures);
+
+    for (int i = 0; i < 64; i++)
     {
-        pieces.emplace_back(Piece::Pawn | Piece::White, glm::vec2(i, -5.0f), &textures[0]);
-    }
-    // Add black pieces
-    pieces.emplace_back(Piece::Rook | Piece::Black, glm::vec2(-7.0f, 7.0f), &textures[3]);
-    pieces.emplace_back(Piece::Knight | Piece::Black, glm::vec2(-5.0f, 7.0f), &textures[5]);
-    pieces.emplace_back(Piece::Bishop | Piece::Black, glm::vec2(-3.0f, 7.0f), &textures[7]);
-    pieces.emplace_back(Piece::Queen | Piece::Black, glm::vec2(-1.0f, 7.0f), &textures[9]);
-    pieces.emplace_back(Piece::King | Piece::Black, glm::vec2(1.0f, 7.0f), &textures[11]);
-    pieces.emplace_back(Piece::Bishop | Piece::Black, glm::vec2(3.0f, 7.0f), &textures[7]);
-    pieces.emplace_back(Piece::Knight | Piece::Black, glm::vec2(5.0f, 7.0f), &textures[5]);
-    pieces.emplace_back(Piece::Rook | Piece::Black, glm::vec2(7.0f, 7.0f), &textures[3]);
-    // Black pawns
-    for (int i = -7; i < 8; i += 2)
-    {
-        pieces.emplace_back(Piece::Pawn | Piece::Black, glm::vec2(i, 5.0f), &textures[1]);
+        int row = i / 8;
+        int col = i % 8;
+
+        // Calculate the position of the cell in OpenGL coordinates
+        float x = -7.0f + 2.0f * (static_cast<float>(col));
+        float y = -7.0f + 2.0f * (static_cast<float>(row));
+
+        // Get piece type
+        int pieceType = chessBoard.Square[i];
+        // Get texture from piece type
+        Texture *pieceTexture = getTexture(pieceType, textures);
+
+        // Store the piece in the vector
+        if (pieceTexture != nullptr)
+            pieces.emplace_back(pieceType, glm::vec2(x, y), pieceTexture);
     }
 }
 
