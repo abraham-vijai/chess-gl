@@ -34,17 +34,71 @@ void processInput(GLFWwindow *window);
 void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex);
 void initializePieces(Texture textures[]);
 void parseFenString(const std::string &fenString, Board &board, Texture textures[]);
-void convertToOpenGLCoordinates(float xpos, float ypos, float &mouseX, float &mouseY);
 Texture *getTexture(int pieceType, Texture textures[]);
 
 // -----------------------------------------------
 // GLOBAL VARIABLES
 // -----------------------------------------------
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 800;
-PieceStruct* selectedPiece = nullptr;
+#define SCR_WIDTH 800
+#define SCR_HEIGHT 800
+#define FEN_STRING "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
+PieceStruct *selectedPiece = nullptr;
 std::vector<PieceStruct> pieces;
-#define FEN_STRING "r1bq1b2/p1pppppp/4kn2/1pn1P2r/6P1/2PP1P1P/PP6/RNBQKBNR"
+
+void printPieceData()
+{
+    std::cout << "\n============= Piece Data =============" << std::endl;
+
+    // Extract the color bits (bits 4 and 5)
+    unsigned int color = selectedPiece->pieceType & (Piece::White | Piece::Black);
+
+    if (color == Piece::White)
+    {
+        std::cout << "Piece Color: White" << std::endl;
+    }
+    else if (color == Piece::Black)
+    {
+        std::cout << "Piece Color: Black" << std::endl;
+    }
+    else
+    {
+        std::cout << "Piece Color: Unknown" << std::endl;
+    }
+
+    // Extract the piece type bits (last 3 bits)
+    unsigned int type = selectedPiece->pieceType & 0x07; // Mask with 0x07 to get the last 3 bits
+
+    std::cout << "Piece Type: ";
+    switch (type)
+    {
+    case Piece::King:
+        std::cout << "King" << std::endl;
+        break;
+    case Piece::Queen:
+        std::cout << "Queen" << std::endl;
+        break;
+    case Piece::Bishop:
+        std::cout << "Bishop" << std::endl;
+        break;
+    case Piece::Rook:
+        std::cout << "Rook" << std::endl;
+        break;
+    case Piece::Pawn:
+        std::cout << "Pawn" << std::endl;
+        break;
+    case Piece::Knight:
+        std::cout << "Knight" << std::endl;
+        break;
+    case Piece::None:
+        std::cout << "None" << std::endl;
+        break;
+    default:
+        std::cout << "Unknown" << std::endl;
+        break;
+    }
+
+    std::cout << "Piece Position: " << selectedPiece->piecePos.x << ", " << selectedPiece->piecePos.y << std::endl;
+}
 
 int main()
 {
@@ -71,6 +125,7 @@ int main()
     // Callback functions
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
+
     // -----------------------------------------------
     // LOAD GLAD
     // -----------------------------------------------
@@ -89,6 +144,7 @@ int main()
     // -----------------------------------------------
     // SETUP VERTEX DATA
     // -----------------------------------------------
+    // Board vertices
     float rectangleVertices[] = {
         // positions         // colors
         1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom right
@@ -96,10 +152,12 @@ int main()
         -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,  // top left
         1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f    // top right
     };
+    // Board indices
     unsigned int rectangleIndices[] = {
         0, 1, 2, // first triangle
         0, 2, 3  // second triangle
     };
+    // Quad vertices
     float quadVertices[] = {
         // positions   // texture coords
         1.0f, 1.0f, 1.0f, 1.0f,   // top right
@@ -107,6 +165,7 @@ int main()
         -1.0f, -1.0f, 0.0f, 0.0f, // bottom left
         -1.0f, 1.0f, 0.0f, 1.0f   // top left
     };
+    // Quad indices
     unsigned int quadIndices[] = {
         0, 1, 2, // first triangle
         0, 2, 3  // second triangle
@@ -311,6 +370,8 @@ void initializePieces(Texture textures[])
         // Store the piece in the vector
         if (pieceTexture != nullptr)
             pieces.emplace_back(pieceType, glm::vec2(x, y), pieceTexture);
+        else
+            pieces.emplace_back(Piece::None, glm::vec2(x, y), nullptr);
     }
 }
 
@@ -318,26 +379,39 @@ void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex)
 {
     for (const auto &piece : pieces)
     {
+        // Skip rendering if the piece type is None (empty cell)
+        if ((piece.pieceType & 0x07) == Piece::None)
+        {
+            continue;
+        }
+
         shader.use();
-        (*piece.pieceTexture).bind(0, GL_TEXTURE_2D);
+
+        // Bind the texture if it exists
+        if (piece.pieceTexture != nullptr)
+        {
+            (*piece.pieceTexture).bind(0, GL_TEXTURE_2D);
+        }
+        else
+        {
+            // No texture (this should not happen for valid pieces)
+            shader.setInt("pieceTexture", 0);
+        }
+
+        // Apply transformations
         glm::mat4 transform = glm::mat4(1.0f);
         transform = glm::scale(transform, glm::vec3(0.125f, 0.125f, 1.0f));
         transform = glm::translate(transform, glm::vec3(piece.piecePos.x, piece.piecePos.y, 0.0f));
         shader.setMat4("transform", transform);
+
+        // Render the quad
         quad.renderShape(quadIndex, 6, 6, GL_TRIANGLES);
     }
 }
-
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-}
-
-void convertToOpenGLCoordinates(float xpos, float ypos, float &mouseX, float &mouseY)
-{
-    mouseX = (xpos / SCR_WIDTH) * 2.0f - 1.0f;
-    mouseY = 1.0f - (ypos / SCR_HEIGHT) * 2.0f;
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
@@ -349,8 +423,10 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     {
+        selectedPiece = nullptr;
+
         double xPos, yPos;
-        int x, y; 
+        int x, y;
 
         // Get the mouse position
         glfwGetCursorPos(window, &xPos, &yPos);
@@ -361,7 +437,8 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 
         // Get the index of the selected square
         int selectedIndex = y * 8 + x;
-        // Get the selected piece
-        selectedPiece = &pieces[selectedIndex];  
+        // Set the selected piece
+        selectedPiece = &pieces[selectedIndex];
+        printPieceData();
     }
 }
