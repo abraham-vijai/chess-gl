@@ -29,11 +29,12 @@ struct PieceStruct
 // FUNCTION PROTOTYPES
 // -----------------------------------------------
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods);
 void processInput(GLFWwindow *window);
 void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex);
 void initializePieces(Texture textures[]);
 void parseFenString(const std::string &fenString, Board &board, Texture textures[]);
-void convertToOpenGLCoordinates(double xpos, double ypos, float &mouseX, float &mouseY);
+void convertToOpenGLCoordinates(float xpos, float ypos, float &mouseX, float &mouseY);
 Texture *getTexture(int pieceType, Texture textures[]);
 
 // -----------------------------------------------
@@ -41,26 +42,9 @@ Texture *getTexture(int pieceType, Texture textures[]);
 // -----------------------------------------------
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
+PieceStruct* selectedPiece = nullptr;
 std::vector<PieceStruct> pieces;
 #define FEN_STRING "r1bq1b2/p1pppppp/4kn2/1pn1P2r/6P1/2PP1P1P/PP6/RNBQKBNR"
-
-void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
-{
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-    {
-        double xPos, yPos;
-        float x, y;
-
-        // Get the mouse position
-        glfwGetCursorPos(window, &xPos, &yPos);
-
-        // Convert to OpenGL coordinates
-        convertToOpenGLCoordinates(xPos, yPos, x, y);
-
-        // Check which piece is clicked
-        std::cout << "\nx :" << x << "\ny: " << y << std::endl;
-    }
-}
 
 int main()
 {
@@ -350,13 +334,34 @@ void processInput(GLFWwindow *window)
         glfwSetWindowShouldClose(window, true);
 }
 
-void convertToOpenGLCoordinates(double xpos, double ypos, float &mouseX, float &mouseY)
+void convertToOpenGLCoordinates(float xpos, float ypos, float &mouseX, float &mouseY)
 {
-    mouseX = (static_cast<float>(xpos) / SCR_WIDTH) * 2.0f - 1.0f;
-    mouseY = 1.0f - (static_cast<float>(ypos) / SCR_HEIGHT) * 2.0f;
+    mouseX = (xpos / SCR_WIDTH) * 2.0f - 1.0f;
+    mouseY = 1.0f - (ypos / SCR_HEIGHT) * 2.0f;
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        double xPos, yPos;
+        int x, y; 
+
+        // Get the mouse position
+        glfwGetCursorPos(window, &xPos, &yPos);
+
+        // Get the x and y coordinates
+        x = xPos / (SCR_WIDTH / 8);
+        y = yPos / (SCR_HEIGHT / 8);
+
+        // Get the index of the selected square
+        int selectedIndex = y * 8 + x;
+        // Get the selected piece
+        selectedPiece = &pieces[selectedIndex];  
+    }
 }
