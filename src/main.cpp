@@ -30,9 +30,10 @@ struct PieceStruct
 // -----------------------------------------------
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
-void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex, const std::vector<PieceStruct> &pieces);
-void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[]);
+void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex);
+void initializePieces(Texture textures[]);
 void parseFenString(const std::string &fenString, Board &board, Texture textures[]);
+void convertToOpenGLCoordinates(double xpos, double ypos, float &mouseX, float &mouseY);
 Texture *getTexture(int pieceType, Texture textures[]);
 
 // -----------------------------------------------
@@ -40,7 +41,26 @@ Texture *getTexture(int pieceType, Texture textures[]);
 // -----------------------------------------------
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
-#define FEN_STRING "r1bqkbnr/p1pppppp/8/1pn1P3/6P1/2PP1P1P/PP6/RNBQKBNR"
+std::vector<PieceStruct> pieces;
+#define FEN_STRING "r1bq1b2/p1pppppp/4kn2/1pn1P2r/6P1/2PP1P1P/PP6/RNBQKBNR"
+
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        double xPos, yPos;
+        float x, y;
+
+        // Get the mouse position
+        glfwGetCursorPos(window, &xPos, &yPos);
+
+        // Convert to OpenGL coordinates
+        convertToOpenGLCoordinates(xPos, yPos, x, y);
+
+        // Check which piece is clicked
+        std::cout << "\nx :" << x << "\ny: " << y << std::endl;
+    }
+}
 
 int main()
 {
@@ -66,7 +86,7 @@ int main()
     glfwMakeContextCurrent(window);
     // Callback functions
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
     // -----------------------------------------------
     // LOAD GLAD
     // -----------------------------------------------
@@ -149,8 +169,7 @@ int main()
     pieceShader.setInt("pieceTexture", 0);
 
     // Initialize pieces
-    std::vector<PieceStruct> pieces;
-    initializePieces(pieces, textures);
+    initializePieces(textures);
 
     // -----------------------------------------------
     // MAIN LOOP
@@ -169,7 +188,7 @@ int main()
         ourShader.use();
         board.renderShape(boardIndex, 6, 6, GL_TRIANGLES);
         // Render pieces
-        renderPieces(pieceShader, quad, quadIndex, pieces);
+        renderPieces(pieceShader, quad, quadIndex);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -183,11 +202,7 @@ void parseFenString(const std::string &fenString, Board &board, Texture textures
 {
     // Map FEN characters to piece types
     static const std::unordered_map<char, int> fenToPiece = {
-        {'r', Piece::Rook | Piece::Black}, {'n', Piece::Knight | Piece::Black}, {'b', Piece::Bishop | Piece::Black}, 
-        {'q', Piece::Queen | Piece::Black}, {'k', Piece::King | Piece::Black}, {'p', Piece::Pawn | Piece::Black}, 
-        {'R', Piece::Rook | Piece::White}, {'N', Piece::Knight | Piece::White}, {'B', Piece::Bishop | Piece::White}, 
-        {'Q', Piece::Queen | Piece::White}, {'K', Piece::King | Piece::White}, {'P', Piece::Pawn | Piece::White}
-    };
+        {'r', Piece::Rook | Piece::Black}, {'n', Piece::Knight | Piece::Black}, {'b', Piece::Bishop | Piece::Black}, {'q', Piece::Queen | Piece::Black}, {'k', Piece::King | Piece::Black}, {'p', Piece::Pawn | Piece::Black}, {'R', Piece::Rook | Piece::White}, {'N', Piece::Knight | Piece::White}, {'B', Piece::Bishop | Piece::White}, {'Q', Piece::Queen | Piece::White}, {'K', Piece::King | Piece::White}, {'P', Piece::Pawn | Piece::White}};
 
     int squareIndex = 0; // Tracks the current square on the board
 
@@ -288,7 +303,7 @@ Texture *getTexture(int pieceType, Texture textures[])
     return nullptr;
 }
 
-void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[])
+void initializePieces(Texture textures[])
 {
     pieces.clear();
 
@@ -315,7 +330,7 @@ void initializePieces(std::vector<PieceStruct> &pieces, Texture textures[])
     }
 }
 
-void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex, const std::vector<PieceStruct> &pieces)
+void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex)
 {
     for (const auto &piece : pieces)
     {
@@ -333,6 +348,12 @@ void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+}
+
+void convertToOpenGLCoordinates(double xpos, double ypos, float &mouseX, float &mouseY)
+{
+    mouseX = (static_cast<float>(xpos) / SCR_WIDTH) * 2.0f - 1.0f;
+    mouseY = 1.0f - (static_cast<float>(ypos) / SCR_HEIGHT) * 2.0f;
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
