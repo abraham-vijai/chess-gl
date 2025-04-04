@@ -17,6 +17,7 @@
 struct PieceStruct
 {
     int pieceType = 0;
+    int pieceColor = pieceType & (8 | 16);
     glm::vec2 piecePos = glm::vec2(0.0f, 0.0f);
     Texture *pieceTexture;
 
@@ -45,9 +46,17 @@ void printPieceData();
 #define FEN_STRING "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"
 PieceStruct *selectedPiece = nullptr;
 std::vector<PieceStruct> pieces;
-glm::vec2 selectedCell = glm::vec2(1.0f, 1.0f); // Initialize to an invalid cell
+glm::vec2 selectedCell = glm::vec2(1.0f, 1.0f);
+std::vector<glm::vec2> validMoves; // Set of valid cells to highlight for a selected piece
 bool isCellSelected = false;
 
+void checkValidMoves()
+{
+    if (selectedPiece->pieceType == Piece::Pawn)
+    {
+        // Move only forward
+    }
+}
 int main()
 {
     // -----------------------------------------------
@@ -88,7 +97,7 @@ int main()
     // -----------------------------------------------
     Shader boardShader("../shaders/board_vs.vert", "../shaders/board_fs.frag");
     Shader pieceShader("../shaders/piece_vs.vert", "../shaders/piece_fs.frag");
-    boardShader.setVec3("gridColor", glm::vec3(0.6f, 0.3f, 0.1f));
+
     // -----------------------------------------------
     // SETUP VERTEX DATA
     // -----------------------------------------------
@@ -170,10 +179,8 @@ int main()
         // Input
         processInput(window);
 
-        if (selectedPiece != nullptr)
-        {
-            boardShader.use();
-        }
+        // Hightlight the cells in validMoves
+
         // -----------------------------------------------
         // RENDER
         // -----------------------------------------------
@@ -181,8 +188,8 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         // Render board
         boardShader.use();
-        boardShader.setVec2("selectedCell", selectedCell);     // Pass the selected cell coordinates
-        boardShader.setBool("isCellSelected", isCellSelected); // Pass whether a cell is selected
+        boardShader.setVec2("selectedCell", selectedCell);
+        boardShader.setBool("isCellSelected", isCellSelected);
         board.renderShape(boardIndex, 6, 6, GL_TRIANGLES);
         // Render pieces
         renderPieces(pieceShader, quad, quadIndex);
@@ -249,7 +256,6 @@ Texture *getTexture(int pieceType, Texture textures[])
 {
     // Check if the piece is black or white
     bool isBlack = (pieceType & Piece::Black) == Piece::Black;
-    bool isWhite = (pieceType & Piece::White) == Piece::White;
 
     // Mask out the color bits to get the piece type
     int type = pieceType & 0b111; // 0b111 is the mask for the piece type
@@ -275,7 +281,7 @@ Texture *getTexture(int pieceType, Texture textures[])
             return nullptr; // Unknown piece type
         }
     }
-    else if (isWhite)
+    else
     {
         switch (type)
         {
@@ -334,7 +340,7 @@ void renderPieces(Shader &shader, ShapeManager &quad, int quadIndex)
     for (const auto &piece : pieces)
     {
         // Skip rendering if the piece type is None (empty cell)
-        if ((piece.pieceType & 0x07) == Piece::None)
+        if ((piece.pieceType & 7) == Piece::None)
         {
             continue;
         }
@@ -367,14 +373,11 @@ void printPieceData()
 {
     std::cout << "\n============= Piece Data =============" << std::endl;
 
-    // Extract the color bits (bits 4 and 5)
-    unsigned int color = selectedPiece->pieceType & (Piece::White | Piece::Black);
-
-    if (color == Piece::White)
+    if (selectedPiece->pieceColor == Piece::White)
     {
         std::cout << "Piece Color: White" << std::endl;
     }
-    else if (color == Piece::Black)
+    else if (selectedPiece->pieceColor == Piece::Black)
     {
         std::cout << "Piece Color: Black" << std::endl;
     }
@@ -384,7 +387,7 @@ void printPieceData()
     }
 
     // Extract the piece type bits (last 3 bits)
-    unsigned int type = selectedPiece->pieceType & 0x07; // Mask with 0x07 to get the last 3 bits
+    unsigned int type = selectedPiece->pieceType & 7; // Mask with 7 to get the last 3 bits
 
     std::cout << "Piece Type: ";
     switch (type)
@@ -449,10 +452,44 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
         int selectedIndex = y * 8 + x;
         // Set the selected piece
         selectedPiece = &pieces[selectedIndex];
-        // Print piece data
-        printPieceData();
-        // Update the selected cell coordinates
-        selectedCell = glm::vec2(x, 7 - y);
-        isCellSelected = true;
+        // If empty cells are selected
+        if ((selectedPiece->pieceType & 7) == Piece::None)
+        {
+            selectedPiece = nullptr;
+            isCellSelected = false;
+        }
+        else
+        {
+            // Print piece data
+            printPieceData();
+
+            // Update the selected cell coordinates
+            selectedCell = glm::vec2(x, 7 - y);
+            isCellSelected = true;
+
+            // Check the valid moves for the selected piece
+            if (selectedPiece != nullptr)
+            {
+                validMoves.clear();
+                float multiplier = (selectedPiece->pieceColor == Piece::White) ? 1.0f : -1.0f;
+
+                // If selected piece is pawn
+                if ((selectedPiece->pieceType & 7) == Piece::Pawn)
+                {
+                    selectedCell.y += 1.0f * multiplier;
+                    validMoves.emplace_back(selectedCell);
+                }
+
+                // If selected piece is rook
+                else if ((selectedPiece->pieceType & 7) == Piece::Rook)
+                {
+                    for (int i = (int)selectedCell.y + 1; i < 7; i++)
+                    {
+                        selectedCell.y += 1.0f * multiplier;
+                        validMoves.emplace_back(selectedCell);
+                    }
+                }
+            }
+        }
     }
 }
